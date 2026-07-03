@@ -1,0 +1,6 @@
+name: lastfm
+version: "0.1"
+description: "A plugin to interact with the Last.fm API song data to fetch scrobbles, top tracks, and current listening status."
+requires_env:
+  - LASTFM_API_KEY
+  - LASTFM_USERNAME

@@ -1,0 +1,6 @@
+name: retroachievements
+version: "0.1"
+description: "A plugin to interact with the RetroAchievements API to fetch recent achievements, game progress, and retro game details."
+requires_env:
+  - RETROACHIEVEMENTS_API_KEY
+  - RETROACHIEVEMENTS_USERNAME
