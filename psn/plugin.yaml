@@ -1,0 +1,5 @@
+name: psn
+version: "0.1"
+description: "A plugin to interact with the PlayStation Network (via PSNAWP) to fetch recently played games, trophies, and owned games. The NPSSO needs to be refreshed around every two months, worth reminding the user."
+requires_env:
+  - PSN_NPSSO

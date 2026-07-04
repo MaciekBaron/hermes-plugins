@@ -29,3 +29,17 @@ Tools:
 - `retroachievements_get_recently_played_games`
 - `retroachievements_get_game_progress`
 - `retroachievements_get_game_details`
+
+### psn
+
+Interact with the PlayStation Network (via PSNAWP) to fetch recently played games, trophies, and owned games.
+
+Requires: `PSN_NPSSO` (expires roughly every two months and needs to be refreshed)
+
+Tools:
+- `psn_get_recently_played_games`
+- `psn_get_game_trophies`
+- `psn_get_recent_trophies`
+- `psn_list_owned_games`
+- `psn_check_game_owned`
+- `psn_get_online_friends`
