@@ -43,3 +43,4 @@ Tools:
 - `psn_list_owned_games`
 - `psn_check_game_owned`
 - `psn_get_online_friends`
+- `psn_search_games`

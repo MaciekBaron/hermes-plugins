@@ -15,20 +15,27 @@ GET_RECENTLY_PLAYED_GAMES_SCHEMA = {
 
 GET_GAME_TROPHIES_SCHEMA = {
     "name": "psn_get_game_trophies",
-    "description": "Get all trophies (and earned status) for a specific game title.",
+    "description": (
+        "Get all trophies (and earned status) for a specific game title, plus a completion summary. "
+        "Provide either title_id (recommended, e.g. from psn_check_game_owned/psn_list_owned_games) to "
+        "auto-detect the np_communication_id and platform, or np_communication_id together with platform."
+    ),
     "parameters": {
         "type": "object",
         "properties": {
+            "title_id": {
+                "type": "string",
+                "description": "The game's title ID (e.g. 'CUSA00265_00' or 'PPSA13956_00'). Used to auto-detect np_communication_id and platform.",
+            },
             "np_communication_id": {
                 "type": "string",
-                "description": "The game's NP communication ID (e.g. 'NPWR22810_00').",
+                "description": "The game's NP communication ID (e.g. 'NPWR22810_00'). Requires platform to also be set.",
             },
             "platform": {
                 "type": "string",
-                "description": "The platform the title belongs to: PS3, PS4, PS5, PSVITA, or PSPC.",
+                "description": "The platform the title belongs to: PS3, PS4, PS5, PSVITA, or PSPC. Required with np_communication_id; optional (auto-detected) with title_id.",
             },
         },
-        "required": ["np_communication_id", "platform"],
     },
 }
 
@@ -45,8 +52,8 @@ GET_RECENT_TROPHIES_SCHEMA = {
             },
             "titles_to_scan": {
                 "type": "integer",
-                "description": "Number of most recently updated game titles to scan for trophies (default: 5).",
-                "default": 5,
+                "description": "Number of most recently updated game titles to scan for trophies (default: 10).",
+                "default": 10,
             },
         },
     },
@@ -62,6 +69,11 @@ LIST_OWNED_GAMES_SCHEMA = {
                 "type": "integer",
                 "description": "Number of owned games to return (default: 50).",
                 "default": 50,
+            },
+            "games_only": {
+                "type": "boolean",
+                "description": "Exclude non-game entitlements (streaming apps, etc.) when the API flags them as such (default: true).",
+                "default": True,
             },
         },
     },
@@ -91,5 +103,29 @@ GET_ONLINE_FRIENDS_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {},
+    },
+}
+
+SEARCH_GAMES_SCHEMA = {
+    "name": "psn_search_games",
+    "description": (
+        "Search the PlayStation Store catalog for games and add-ons by name. "
+        "This searches the whole store, not just games the user owns — use psn_check_game_owned "
+        "or psn_list_owned_games to check ownership. Useful to get a game's price."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "The search query (game name).",
+            },
+            "count": {
+                "type": "integer",
+                "description": "Number of results to return (default: 10).",
+                "default": 10,
+            },
+        },
+        "required": ["query"],
     },
 }

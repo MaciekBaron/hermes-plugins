@@ -2,6 +2,7 @@ import os
 import json
 
 from psnawp_api import PSNAWP
+from psnawp_api.models.search import SearchDomain
 from psnawp_api.models.trophies import PlatformType
 
 _psnawp = None
@@ -17,6 +18,11 @@ def _get_client():
         _psnawp = PSNAWP(npsso)
         _client = _psnawp.me()
     return _client
+
+
+def _get_psnawp():
+    _get_client()
+    return _psnawp
 
 
 def _dt(value):
@@ -36,6 +42,37 @@ def _platform_type(platform):
         raise ValueError(
             f"Unknown platform '{platform}'. Expected one of: PS3, PS4, PS5, PSVITA, PSPC."
         )
+
+
+_PLATFORM_PRIORITY = [PlatformType.PS5, PlatformType.PS4, PlatformType.PS3, PlatformType.PS_VITA, PlatformType.PSPC]
+
+
+def _sorted_platforms(platforms):
+    platforms = set(platforms)
+    ordered = [p for p in _PLATFORM_PRIORITY if p in platforms]
+    ordered += [p for p in platforms if p not in ordered]
+    return ordered
+
+
+def _resolve_trophy_title(client, title_id):
+    matches = list(client.trophy_titles_for_title([title_id]))
+    if not matches:
+        raise ValueError(f"No trophy title found for title_id '{title_id}'.")
+    match = matches[0]
+    if not match.np_communication_id or not match.title_platform:
+        raise ValueError(f"Could not resolve trophy info for title_id '{title_id}'.")
+    return match.np_communication_id, match.title_platform
+
+
+def _fetch_trophies_any_platform(client, np_communication_id, platforms, **kwargs):
+    last_error = None
+    for platform in _sorted_platforms(platforms):
+        try:
+            return list(client.trophies(np_communication_id, platform, **kwargs)), platform
+        except Exception as e:
+            last_error = e
+            continue
+    raise last_error or ValueError("No trophies found for any platform.")
 
 
 def get_recently_played_games(params, **kwargs):
@@ -64,17 +101,42 @@ def get_game_trophies(params, **kwargs):
     try:
         client = _get_client()
         np_communication_id = params.get("np_communication_id")
-        if not np_communication_id:
-            raise ValueError("Missing required parameter: np_communication_id")
-        platform = _platform_type(params.get("platform"))
+        title_id = params.get("title_id")
+        platform = params.get("platform")
+
+        if not np_communication_id and not title_id:
+            raise ValueError("Provide either np_communication_id (with platform) or title_id.")
+
+        if np_communication_id:
+            if not platform:
+                raise ValueError(
+                    "platform is required when np_communication_id is provided directly; "
+                    "provide title_id instead to auto-detect it."
+                )
+            trophies_iter = client.trophies(np_communication_id, _platform_type(platform), include_progress=True)
+        else:
+            np_communication_id, platforms = _resolve_trophy_title(client, title_id)
+            if platform:
+                trophies_iter = client.trophies(np_communication_id, _platform_type(platform), include_progress=True)
+            else:
+                trophies_iter, _ = _fetch_trophies_any_platform(client, np_communication_id, platforms, include_progress=True)
 
         trophies = []
-        for trophy in client.trophies(np_communication_id, platform, include_progress=True):
+        earned_count = 0
+        platinum_earned = False
+        for trophy in trophies_iter:
+            earned = bool(trophy.earned)
+            if earned:
+                earned_count += 1
+            trophy_type = trophy.trophy_type.value if trophy.trophy_type else None
+            if earned and trophy_type == "platinum":
+                platinum_earned = True
+
             trophies.append({
                 "trophy_id": trophy.trophy_id,
                 "name": trophy.trophy_name,
                 "detail": trophy.trophy_detail,
-                "type": trophy.trophy_type.value if trophy.trophy_type else None,
+                "type": trophy_type,
                 "hidden": trophy.trophy_hidden,
                 "earned": trophy.earned,
                 "earned_date": _dt(trophy.earned_date_time),
@@ -82,7 +144,16 @@ def get_game_trophies(params, **kwargs):
                 "earn_rate": trophy.trophy_earn_rate,
             })
 
-        return json.dumps({"success": True, "trophies": trophies})
+        total = len(trophies)
+        summary = {
+            "total": total,
+            "earned": earned_count,
+            "unearned": total - earned_count,
+            "completion_pct": round(earned_count / total * 100, 1) if total else 0.0,
+            "platinum_earned": platinum_earned,
+        }
+
+        return json.dumps({"success": True, "summary": summary, "trophies": trophies})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
@@ -91,14 +162,20 @@ def get_recent_trophies(params, **kwargs):
     try:
         client = _get_client()
         count = params.get("count", 10)
-        titles_to_scan = params.get("titles_to_scan", 5)
+        titles_to_scan = params.get("titles_to_scan", 10)
 
         earned = []
         for title in client.trophy_titles(limit=titles_to_scan):
-            if not title.title_platform:
+            if not title.np_communication_id or not title.title_platform:
                 continue
-            platform = next(iter(title.title_platform))
-            for trophy in client.trophies(title.np_communication_id, platform, include_progress=True):
+            try:
+                trophies, _ = _fetch_trophies_any_platform(
+                    client, title.np_communication_id, title.title_platform, include_progress=True
+                )
+            except Exception:
+                continue
+
+            for trophy in trophies:
                 if trophy.earned and trophy.earned_date_time:
                     earned.append({
                         "game": title.title_name,
@@ -122,9 +199,13 @@ def list_owned_games(params, **kwargs):
     try:
         client = _get_client()
         count = params.get("count", 50)
+        games_only = params.get("games_only", True)
 
         games = []
-        for entitlement in client.game_entitlements(limit=count):
+        for entitlement in client.game_entitlements(page_size=100):
+            if games_only and entitlement.get("isGame") is False:
+                continue
+
             title_meta = entitlement.get("titleMeta") or {}
             game_meta = entitlement.get("gameMeta") or {}
             games.append({
@@ -133,6 +214,9 @@ def list_owned_games(params, **kwargs):
                 "active": entitlement.get("activeFlag"),
                 "active_date": entitlement.get("activeDate"),
             })
+
+            if len(games) >= count:
+                break
 
         return json.dumps({"success": True, "games": games})
     except Exception as e:
@@ -196,5 +280,34 @@ def get_online_friends(params, **kwargs):
                 })
 
         return json.dumps({"success": True, "friends": online_friends})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def search_games(params, **kwargs):
+    try:
+        psnawp = _get_psnawp()
+        query = params.get("query")
+        if not query:
+            raise ValueError("Missing required parameter: query")
+        count = params.get("count", 10)
+
+        results = []
+        for item in psnawp.search(query, SearchDomain.FULL_GAMES, limit=count):
+            result = item.get("result") or {}
+            price = result.get("price") or {}
+            results.append({
+                "concept_id": item.get("id"),
+                "name": result.get("name"),
+                "invariant_name": result.get("invariantName"),
+                "type": result.get("itemType"),
+                "platforms": result.get("platforms"),
+                "classification": result.get("storeDisplayClassification"),
+                "price": price.get("basePrice"),
+                "discounted_price": price.get("discountedPrice"),
+                "is_free": price.get("isFree"),
+            })
+
+        return json.dumps({"success": True, "results": results})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})

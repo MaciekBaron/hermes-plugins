@@ -55,3 +55,12 @@ def register(ctx):
         handler=tools.get_online_friends,
         description="Get the user's friends who are currently online."
     )
+
+    # Register Game Search Tool
+    ctx.register_tool(
+        name="psn_search_games",
+        toolset="psn",
+        schema=schemas.SEARCH_GAMES_SCHEMA,
+        handler=tools.search_games,
+        description="Search the PlayStation Store catalog for games and add-ons by name."
+    )
