@@ -17,23 +17,25 @@ GET_GAME_TROPHIES_SCHEMA = {
     "name": "psn_get_game_trophies",
     "description": (
         "Get all trophies (and earned status) for a specific game title, plus a completion summary. "
-        "Provide either title_id (recommended, e.g. from psn_check_game_owned/psn_list_owned_games) to "
-        "auto-detect the np_communication_id and platform, or np_communication_id together with platform."
+        "Provide title_id (recommended, e.g. from psn_check_game_owned/psn_list_owned_games) to auto-detect "
+        "the np_communication_id, or np_communication_id directly. The platform is auto-detected by trying "
+        "every platform if not given or if the given/detected one doesn't have trophy data — platform is "
+        "only a hint to try first, never required."
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "title_id": {
                 "type": "string",
-                "description": "The game's title ID (e.g. 'CUSA00265_00' or 'PPSA13956_00'). Used to auto-detect np_communication_id and platform.",
+                "description": "The game's title ID (e.g. 'CUSA00265_00' or 'PPSA13956_00'). Used to auto-detect np_communication_id.",
             },
             "np_communication_id": {
                 "type": "string",
-                "description": "The game's NP communication ID (e.g. 'NPWR22810_00'). Requires platform to also be set.",
+                "description": "The game's NP communication ID (e.g. 'NPWR22810_00'), if already known.",
             },
             "platform": {
                 "type": "string",
-                "description": "The platform the title belongs to: PS3, PS4, PS5, PSVITA, or PSPC. Required with np_communication_id; optional (auto-detected) with title_id.",
+                "description": "Optional hint for the platform to try first: PS3, PS4, PS5, PSVITA, or PSPC. Every platform is tried regardless if this doesn't pan out.",
             },
         },
     },

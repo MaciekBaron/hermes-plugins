@@ -2,6 +2,7 @@ import os
 import json
 
 from psnawp_api import PSNAWP
+from psnawp_api.core import PSNAWPNotFoundError
 from psnawp_api.models.search import SearchDomain
 from psnawp_api.models.trophies import PlatformType
 
@@ -48,14 +49,23 @@ _PLATFORM_PRIORITY = [PlatformType.PS5, PlatformType.PS4, PlatformType.PS3, Plat
 
 
 def _sorted_platforms(platforms):
-    platforms = set(platforms)
+    # Treat the title's reported platforms as a priority hint, not a strict filter — PSN
+    # sometimes reports an incomplete/wrong platform set for a title, so fall through to
+    # every other platform rather than give up when the reported set doesn't pan out.
+    platforms = set(platforms or [])
     ordered = [p for p in _PLATFORM_PRIORITY if p in platforms]
-    ordered += [p for p in platforms if p not in ordered]
+    ordered += [p for p in _PLATFORM_PRIORITY if p not in platforms]
     return ordered
 
 
 def _resolve_trophy_title(client, title_id):
-    matches = list(client.trophy_titles_for_title([title_id]))
+    try:
+        matches = list(client.trophy_titles_for_title([title_id]))
+    except PSNAWPNotFoundError:
+        raise ValueError(
+            f"No trophy data found for title_id '{title_id}'. The game may not have been "
+            "launched yet, may not support trophies, or the title_id may be incorrect."
+        )
     if not matches:
         raise ValueError(f"No trophy title found for title_id '{title_id}'.")
     match = matches[0]
@@ -105,21 +115,29 @@ def get_game_trophies(params, **kwargs):
         platform = params.get("platform")
 
         if not np_communication_id and not title_id:
-            raise ValueError("Provide either np_communication_id (with platform) or title_id.")
+            raise ValueError("Provide either np_communication_id or title_id.")
 
-        if np_communication_id:
-            if not platform:
-                raise ValueError(
-                    "platform is required when np_communication_id is provided directly; "
-                    "provide title_id instead to auto-detect it."
-                )
-            trophies_iter = client.trophies(np_communication_id, _platform_type(platform), include_progress=True)
-        else:
-            np_communication_id, platforms = _resolve_trophy_title(client, title_id)
-            if platform:
-                trophies_iter = client.trophies(np_communication_id, _platform_type(platform), include_progress=True)
-            else:
-                trophies_iter, _ = _fetch_trophies_any_platform(client, np_communication_id, platforms, include_progress=True)
+        platform_hints = set()
+        if platform:
+            platform_hints.add(_platform_type(platform))
+
+        if not np_communication_id:
+            np_communication_id, resolved_platforms = _resolve_trophy_title(client, title_id)
+            platform_hints |= resolved_platforms
+
+        # Platform metadata reported by PSN for a title is sometimes incomplete or wrong, so
+        # any hint here is tried first but _fetch_trophies_any_platform always falls back to
+        # trying every platform before giving up.
+        try:
+            trophies_iter, resolved_platform = _fetch_trophies_any_platform(
+                client, np_communication_id, platform_hints, include_progress=True
+            )
+        except Exception as e:
+            tried = ", ".join(p.value for p in _sorted_platforms(platform_hints))
+            raise ValueError(
+                f"Could not find trophies for np_communication_id '{np_communication_id}' on any platform "
+                f"(tried {tried}). Original error: {e}"
+            )
 
         trophies = []
         earned_count = 0
@@ -146,6 +164,7 @@ def get_game_trophies(params, **kwargs):
 
         total = len(trophies)
         summary = {
+            "platform": resolved_platform.value,
             "total": total,
             "earned": earned_count,
             "unearned": total - earned_count,
@@ -164,8 +183,13 @@ def get_recent_trophies(params, **kwargs):
         count = params.get("count", 10)
         titles_to_scan = params.get("titles_to_scan", 10)
 
+        try:
+            titles = list(client.trophy_titles(limit=titles_to_scan))
+        except PSNAWPNotFoundError:
+            raise ValueError("Could not fetch the account's trophy titles list (no trophy data or profile is not accessible).")
+
         earned = []
-        for title in client.trophy_titles(limit=titles_to_scan):
+        for title in titles:
             if not title.np_communication_id or not title.title_platform:
                 continue
             try:

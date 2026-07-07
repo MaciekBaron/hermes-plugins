@@ -6,7 +6,7 @@ GET_RECENT_ACHIEVEMENTS_SCHEMA = {
         "properties": {
             "minutes": {
                 "type": "integer",
-                "description": "How far back to look for achievements, in minutes (default: 60).",
+                "description": "How far back to look for achievements, in minutes.",
                 "default": 60,
             },
         },
@@ -21,7 +21,7 @@ GET_RECENTLY_PLAYED_GAMES_SCHEMA = {
         "properties": {
             "count": {
                 "type": "integer",
-                "description": "Number of recently played games to return (default: 10).",
+                "description": "Number of recently played games to return.",
                 "default": 10,
             },
         },

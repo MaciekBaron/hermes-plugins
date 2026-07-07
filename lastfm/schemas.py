@@ -44,7 +44,7 @@ GET_TOP_TRACKS_SCHEMA = {
             },
             "limit": {
                 "type": "integer",
-                "description": "Number of top tracks to return (default: 10).",
+                "description": "Number of top tracks to return.",
                 "default": 10,
             },
         },
@@ -65,7 +65,7 @@ GET_TOP_ARTISTS_SCHEMA = {
             },
             "limit": {
                 "type": "integer",
-                "description": "Number of top artists to return (default: 10).",
+                "description": "Number of top artists to return.",
                 "default": 10,
             },
         },
@@ -86,7 +86,7 @@ GET_TOP_ALBUMS_SCHEMA = {
             },
             "limit": {
                 "type": "integer",
-                "description": "Number of top albums to return (default: 10).",
+                "description": "Number of top albums to return.",
                 "default": 10,
             },
         },
@@ -101,7 +101,7 @@ GET_ARTIST_INFO_SCHEMA = {
         "properties": {
             "artist": {
                 "type": "string",
-                "description": "The name of the artist to look up.",
+                "description": "Name of the artist.",
             },
         },
         "required": ["artist"],
