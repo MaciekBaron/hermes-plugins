@@ -14,12 +14,24 @@ GET_RECENT_TRACKS_SCHEMA = {
         "type": "object",
         "properties": {
             "from_timestamp": {
-                "type": "integer",
-                "description": "Beginning of the time period as a Unix timestamp.",
+                "type": ["integer", "string"],
+                "description": (
+                    "Beginning of the time period. Accepts a Unix timestamp, an "
+                    "ISO date (YYYY-MM-DD), or a natural language expression such "
+                    "as 'today', 'yesterday', 'this week', 'last week', 'this "
+                    "month', 'last month', 'this year', 'last year', '3 days "
+                    "ago', or a weekday name like 'Monday'."
+                ),
             },
             "to_timestamp": {
-                "type": "integer",
-                "description": "End of the time period as a Unix timestamp.",
+                "type": ["integer", "string"],
+                "description": (
+                    "End of the time period. Accepts a Unix timestamp, an ISO "
+                    "date (YYYY-MM-DD), or a natural language expression such as "
+                    "'today', 'yesterday', 'this week', 'last week', 'this "
+                    "month', 'last month', 'this year', 'last year', '3 days "
+                    "ago', or a weekday name like 'Monday'."
+                ),
             },
             "limit": {
                 "type": "integer",

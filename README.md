@@ -1,6 +1,9 @@
 # hermes-plugins
 
-Hermes plugins for interacting with third-party APIs.
+Hermes plugins and skills for interacting with third-party APIs.
+
+`install.sh` symlinks each folder under `plugins/` into `~/.hermes/plugins/`
+and each skill under `skills/<category>/` into `~/.hermes/skills/<category>/`.
 
 ## Plugins
 
@@ -44,3 +47,10 @@ Tools:
 - `psn_check_game_owned`
 - `psn_get_online_friends`
 - `psn_search_games`
+
+## Skills
+
+### music/nts-radio
+
+Check what's currently playing on NTS Radio (both channels) and what's coming up
+next, using curl and jq against the NTS live API.

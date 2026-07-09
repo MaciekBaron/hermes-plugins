@@ -1,8 +1,67 @@
 import os
 import json
 import requests
+import dateparser
+from datetime import datetime, timedelta, timezone
 
 BASE_URL = "http://ws.audioscrobbler.com/2.0/"
+
+def _start_of_day(dt):
+    return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+def _start_of_week(dt):
+    return _start_of_day(dt) - timedelta(days=dt.weekday())
+
+def _shift_months(dt, months):
+    month_index = dt.month - 1 + months
+    year = dt.year + month_index // 12
+    month = month_index % 12 + 1
+    return dt.replace(year=year, month=month, day=1)
+
+def _named_instant(text, now):
+    if text == "now":
+        return now
+    if text == "today":
+        return _start_of_day(now)
+    if text == "yesterday":
+        return _start_of_day(now) - timedelta(days=1)
+    if text == "this week":
+        return _start_of_week(now)
+    if text == "last week":
+        return _start_of_week(now) - timedelta(weeks=1)
+    if text == "this month":
+        return _start_of_day(now).replace(day=1)
+    if text == "last month":
+        return _shift_months(_start_of_day(now), -1)
+    if text == "this year":
+        return _start_of_day(now).replace(month=1, day=1)
+    if text == "last year":
+        return _start_of_day(now).replace(month=1, day=1, year=now.year - 1)
+    return None
+
+def _resolve_time(value):
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+
+    text = str(value).strip().lower()
+    if text.isdigit():
+        return int(text)
+
+    now = datetime.now(timezone.utc)
+
+    instant = _named_instant(text, now)
+    if instant is not None:
+        return int(instant.timestamp())
+
+    parsed = dateparser.parse(text, settings={"RELATIVE_BASE": now.replace(tzinfo=None)})
+    if parsed is not None:
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return int(parsed.timestamp())
+
+    raise ValueError(f"Could not parse time expression: {value!r}")
 
 def _get_auth_params():
     api_key = os.environ.get("LASTFM_API_KEY")
@@ -54,10 +113,13 @@ def get_recent_tracks(params, **kwargs):
             "limit": params.get("limit", 10)
         }
 
-        if "from_timestamp" in params:
-            payload["from"] = params["from_timestamp"]
-        if "to_timestamp" in params:
-            payload["to"] = params["to_timestamp"]
+        from_ts = _resolve_time(params.get("from_timestamp"))
+        if from_ts is not None:
+            payload["from"] = from_ts
+
+        to_ts = _resolve_time(params.get("to_timestamp"))
+        if to_ts is not None:
+            payload["to"] = to_ts
 
         response = requests.get(BASE_URL, params=payload).json()
         tracks_raw = response.get("recenttracks", {}).get("track", [])
